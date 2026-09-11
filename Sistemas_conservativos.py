@@ -214,7 +214,7 @@ def gerar_figura_massa_mola(massa, k_mola, amplitude, duracao_ms):
     return fig
 
 # ============================================
-# GERAÇÃO DE FIGURAS: ABA 3 (RAMPA + MOLA - IMAGEM DE REFERÊNCIA)
+# GERAÇÃO DE FIGURAS: ABA 3 (RAMPA + MOLA - CORRIGIDO)
 # ============================================
 def gerar_figura_rampa_mola_ref(massa, h_max, k_mola, duracao_ms, gravidade=10):
     em_total = massa * gravidade * h_max
@@ -228,45 +228,39 @@ def gerar_figura_rampa_mola_ref(massa, h_max, k_mola, duracao_ms, gravidade=10):
     x_inicio_mola = 2.0
     x_parede = x_inicio_mola + 3.0
 
-    # Pista (Rampa inclinada + trecho plano)
+    # Trace 0: Pista (Rampa inclinada + trecho plano)
     xr = np.linspace(x_topo_rampa, x_base_rampa, 30)
     yr = h_max * ((xr - x_base_rampa) / (x_topo_rampa - x_base_rampa))**2
     
     xp = np.concatenate([xr, np.linspace(x_base_rampa, x_parede, 40)])
     yp = np.concatenate([yr, np.zeros(40)])
-    
     fig.add_trace(go.Scatter(x=xp, y=yp, mode='lines', line=dict(color='#7f8c8d', width=4), hoverinfo='skip'), row=1, col=1)
     
-    # Parede fixa da mola
+    # Trace 1: Parede fixa da mola
     fig.add_trace(go.Scatter(x=[x_parede, x_parede], y=[0, 1.8], mode='lines', line=dict(color='#95a5a6', width=6), hoverinfo='skip'), row=1, col=1)
 
     # Estado Inicial (no topo da rampa)
     bx_ini, by_ini = criar_bloco(x_topo_rampa, h_max, 0.7, 0.7)
     xm_ini, ym_ini = criar_mola(x_inicio_mola, x_parede, 0.35, 12)
 
+    # Trace 2: Mola
     fig.add_trace(go.Scatter(x=xm_ini, y=ym_ini, mode='lines', line=dict(color='#2ecc71', width=3), hoverinfo='skip'), row=1, col=1)
+    # Trace 3: Bloco
     fig.add_trace(go.Scatter(x=bx_ini, y=by_ini, fill="toself", fillcolor="#e74c3c", line=dict(color="#c0392b", width=2), hoverinfo='skip'), row=1, col=1)
+    # Trace 4: Barras de Energia
     fig.add_trace(go.Bar(x=['Ec', 'Epg', 'Epe', 'Em'], y=[0.0, em_total, 0.0, em_total], marker_color=[COR_EC, COR_EPG, COR_EPE, COR_EM], text=[f"0.0J", f"{em_total:.1f}J", f"0.0J", f"{em_total:.1f}J"], textposition='auto'), row=1, col=2)
 
-    # Criação dos quadros da animação física correta (descida -> plano -> compressão total -> retorno)
     frames = []
-    
-    # Gerar posições de x ao longo do tempo de forma contínua e suave
     n_q = 35
-    # 1. Descida da rampa
     t_rampa = np.linspace(x_topo_rampa, x_base_rampa, n_q)
-    # 2. Trecho plano até encostar na mola
     t_plano = np.linspace(x_base_rampa, x_inicio_mola, n_q)
-    # 3. Compressão da mola até a parada total (x_max_comp)
     t_compr = np.linspace(x_inicio_mola, x_inicio_mola + x_max_comp, n_q)
-    # 4. Retorno (descompressão + trecho plano + subida da rampa)
     t_volta = np.linspace(x_inicio_mola + x_max_comp, x_topo_rampa, n_q * 2)
     
     trajetoria_x = np.concatenate([t_rampa, t_plano[1:], t_compr[1:], t_volta[1:]])
 
     for ciclo in range(3):
         for x_a in trajetoria_x:
-            # Cálculo de Altura e Energias
             if x_a < x_base_rampa:
                 a_r = h_max / ((x_topo_rampa - x_base_rampa)**2)
                 y_a = a_r * (x_a - x_base_rampa)**2
@@ -284,7 +278,6 @@ def gerar_figura_rampa_mola_ref(massa, h_max, k_mola, duracao_ms, gravidade=10):
 
             ec = max(0.0, em_total - epg - epe)
 
-            # Geometria dinâmica da mola e bloco
             ponto_inicio_mola = max(x_inicio_mola, x_a)
             xm_f, ym_f = criar_mola(ponto_inicio_mola, x_parede, 0.35, 12)
             bx_f, by_f = criar_bloco(x_a, y_a, 0.7, 0.7)
@@ -295,7 +288,7 @@ def gerar_figura_rampa_mola_ref(massa, h_max, k_mola, duracao_ms, gravidade=10):
                     go.Scatter(x=bx_f, y=by_f),
                     go.Bar(y=[ec, epg, epe, em_total], text=[f"{ec:.1f}J", f"{epg:.1f}J", f"{epe:.1f}J", f"{em_total:.1f}J"])
                 ],
-                traces=[1, 2, 3],
+                traces=[2, 3, 4],  # Índices exatos correspondentes a Mola (2), Bloco (3) e Gráfico de Barras (4)
                 name=f"x_{x_a}"
             ))
 
@@ -337,8 +330,6 @@ def gerar_figura_looping(massa, raio_loop, v_inicial, alt_lancamento, gravidade=
     consegue_passar = h_0 >= topo_loop_y
     
     fig = go.Figure()
-    
-    # Desenho da rampa e do looping
     fig.add_trace(go.Scatter(x=[-5, 0], y=[alt_lancamento, 0], mode='lines', line=dict(color='#7f8c8d', width=4), hoverinfo='skip'))
     
     theta_loop = np.linspace(0, 2*np.pi, 100)

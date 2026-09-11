@@ -288,10 +288,10 @@ def gerar_figura_rampa_mola_ref(massa, h_max, k_mola, duracao_ms, gravidade=10):
     return fig
 
 # ============================================
-# GERAÇÃO DE FIGURAS: ABA 4 (BRINQUEDO LOOPING - CORRIGIDO)
+# GERAÇÃO DE FIGURAS: ABA 4 (BRINQUEDO LOOPING)
 # ============================================
 def gerar_figura_looping_corrigido(massa, raio_loop, v_inicial, duracao_ms, gravidade=10):
-    em_total = 0.5 * massa * (v_inicial**2) # Energia mecânica inicial (potencial no solo = 0)
+    em_total = 0.5 * massa * (v_inicial**2) 
     v_min_topo = math.sqrt(raio_loop * gravidade)
     topo_loop_y = 2 * raio_loop
     
@@ -300,49 +300,31 @@ def gerar_figura_looping_corrigido(massa, raio_loop, v_inicial, duracao_ms, grav
 
     fig = make_subplots(rows=1, cols=2, column_widths=[0.68, 0.32], horizontal_spacing=0.08)
 
-    # Geometria da Pista do Looping:
-    # Centro do loop em (raio_loop, raio_loop)
-    # Linha reta inicial de x = -5.0 até o início da base do loop em x = raio_loop, y = 0
     x_linha = np.linspace(-5.0, raio_loop, 40)
     y_linha = np.zeros(40)
 
-    # Circunferência completa do Loop (theta de pi até -pi descendente para subir pelo lado direito)
-    # Centro = (raio_loop, raio_loop)
     theta_loop = np.linspace(np.pi, -np.pi, 120)
     x_loop = raio_loop + raio_loop * np.sin(theta_loop)
     y_loop = raio_loop + raio_loop * np.cos(theta_loop)
 
-    # Trace 0: Pista completa (Linha reta + Loop)
     fig.add_trace(go.Scatter(x=np.concatenate([x_linha, x_loop]), y=np.concatenate([y_linha, y_loop]), mode='lines', line=dict(color='#7f8c8d', width=4), hoverinfo='skip'), row=1, col=1)
 
-    # Estado Inicial (Carrinho no início da linha reta, x = -5.0, y = 0)
     cx_ini, cy_ini = criar_bloco(-5.0, 0.0, 0.6, 0.6)
-    
-    # Trace 1: Carrinho
     fig.add_trace(go.Scatter(x=cx_ini, y=cy_ini, fill="toself", fillcolor="#e74c3c", line=dict(color="#c0392b", width=2), hoverinfo='skip'), row=1, col=1)
-
-    # Trace 2: Barras de Energia Iniciais (Só cinética na linha reta)
     fig.add_trace(go.Bar(x=['Ec', 'Epg', 'Em'], y=[em_total, 0.0, em_total], marker_color=[COR_EC, COR_EPG, COR_EM], text=[f"{em_total:.1f}J", f"0.0J", f"{em_total:.1f}J"], textposition='auto'), row=1, col=2)
 
     frames = []
     n_q = 40
-    
-    # Fase 1: Movimento na linha reta horizontal (x de -5.0 até raio_loop)
     passos_linha = np.linspace(-5.0, raio_loop, n_q)
     
-    # Fase 2: Movimento no Loop
-    # theta vai de pi (base inferior) descendo para pi/2 (lado direito), 0 (topo), -pi/2 (lado esquerdo) até -pi
     if consegue_passar:
         passos_theta = np.linspace(np.pi, -np.pi, n_q * 3)
     else:
-        # Se não tiver energia suficiente, sobe até a altura máxima e desce de volta pelo mesmo lado
         cos_limite = min(1.0, max(-1.0, (h_max_energia / raio_loop) - 1))
-        # Ângulo correspondente à altura máxima atingível
         theta_limite = math.acos(cos_limite)
         passos_theta = np.concatenate([np.linspace(np.pi, np.pi - theta_limite, n_q), np.linspace(np.pi - theta_limite, np.pi, n_q)])
 
     for ciclo in range(3):
-        # Parte 1: Linha reta (apenas Energia Cinética, Epg = 0)
         for x_a in passos_linha:
             y_a = 0.0
             ec = em_total
@@ -358,7 +340,6 @@ def gerar_figura_looping_corrigido(massa, raio_loop, v_inicial, duracao_ms, grav
                 name=f"linha_{x_a}"
             ))
 
-        # Parte 2: Entrando e subindo pelo loop (conversão progressiva em Energia Potencial Gravitacional)
         for th in passos_theta:
             x_a = raio_loop + raio_loop * math.sin(th)
             y_a = raio_loop + raio_loop * math.cos(th)
@@ -403,7 +384,7 @@ def gerar_figura_looping_corrigido(massa, raio_loop, v_inicial, duracao_ms, grav
 # TÍTULO E NAVEGAÇÃO POR ABAS SUPERIORES
 # ============================================
 st.markdown('<div class="main-title">⚡ Sistemas Conservativos e Dinâmica</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Simulações físicas completas com controle total de animação e loop</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Simulações físicas completas com equações e controle de energia</div>', unsafe_allow_html=True)
 
 if 'velocidade_ms' not in st.session_state:
     st.session_state.velocidade_ms = 30
@@ -421,9 +402,13 @@ tab1, tab2, tab3, tab4 = st.tabs([
 with tab1:
     st.markdown("""
     <div class="concept-card" style="border-left-color: #9b59b6;">
-        <b>Princípio:</b> Esfera oscilando livremente em pista sem atrito.
+        <b>Princípio e Equações:</b> Esfera oscilando livremente em pista sem atrito. A energia mecânica total ($E_m$) é conservada, convertendo-se continuamente entre energia cinética ($E_c$) e potencial gravitacional ($E_{pg}$).
     </div>
     """, unsafe_allow_html=True)
+    
+    st.markdown(r"""
+    $$ E_m = E_c + E_{pg} = \frac{1}{2}mv^2 + mgh = \text{constante} $$
+    """)
     
     col_c1, col_c2 = st.columns([1, 2.5])
     with col_c1:
@@ -449,9 +434,13 @@ with tab1:
 with tab2:
     st.markdown("""
     <div class="concept-card" style="border-left-color: #2ecc71;">
-        <b>Princípio:</b> Bloco oscilando horizontalmente preso a uma mola elástica.
+        <b>Princípio e Equações:</b> Bloco oscilando horizontalmente preso a uma mola elástica. A energia mecânica alterna entre cinética e potencial elástica ($E_{pe}$).
     </div>
     """, unsafe_allow_html=True)
+    
+    st.markdown(r"""
+    $$ E_m = E_c + E_{pe} = \frac{1}{2}mv^2 + \frac{1}{2}kx^2 = \text{constante} $$
+    """)
     
     col_m1, col_m2 = st.columns([1, 2.5])
     with col_m1:
@@ -473,15 +462,18 @@ with tab2:
         st.plotly_chart(fig_m, use_container_width=True, config={'displayModeBar': False})
 
 # ============================================
-# ABA 3: RAMPA + MOLA (REFERÊNCIA DA IMAGEM)
+# ABA 3: RAMPA + MOLA
 # ============================================
 with tab3:
     st.markdown("""
     <div class="concept-card" style="border-left-color: #3498db;">
-        <b>Princípio:</b> Um bloco é solto do repouso no alto de uma rampa inclinada. Ao atingir o trecho plano, 
-        ele colide com a mola, comprimindo-a proporcionalmente à energia mecânica acumulada.
+        <b>Princípio e Equações:</b> Bloco solto do alto da rampa ($h$). Toda a energia potencial gravitacional inicial transforma-se em energia elástica máxima na compressão da mola ($x_{max}$).
     </div>
     """, unsafe_allow_html=True)
+    
+    st.markdown(r"""
+    $$ mgh = \frac{1}{2}k x_{\text{max}}^2 \implies x_{\text{max}} = \sqrt{\frac{2mgh}{k}} $$
+    """)
     
     col_r1, col_r2 = st.columns([1, 2.5])
     with col_r1:
@@ -503,15 +495,19 @@ with tab3:
         st.plotly_chart(fig_rm, use_container_width=True, config={'displayModeBar': False})
 
 # ============================================
-# ABA 4: BRINQUEDO LOOPING (CORRIGIDO TRAJETÓRIA)
+# ABA 4: BRINQUEDO LOOPING
 # ============================================
 with tab4:
     st.markdown("""
     <div class="concept-card" style="border-left-color: #e74c3c;">
-        <b>Princípio do Looping:</b> O carrinho inicia o movimento em linha reta horizontal com velocidade inicial $v_0$ (energia puramente cinética, altura zero). 
-        Em seguida, entra na base do loop, sobe pela parte inicial, atinge o topo (convertendo energia cinética em potencial gravitacional) e completa a volta.
+        <b>Princípio e Equações:</b> O carrinho inicia em linha reta horizontal com velocidade inicial $v_0$ (energia puramente cinética). 
+        Para completar o loop de raio $R$, a velocidade no topo deve satisfazer a condição de tangência dinâmica baseada na força centrípeta.
     </div>
     """, unsafe_allow_html=True)
+    
+    st.markdown(r"""
+    $$ \frac{1}{2}mv_0^2 = \frac{1}{2}mv_{\text{topo}}^2 + mg(2R) \quad \text{e} \quad v_{\text{topo}} \ge \sqrt{Rg} $$
+    """)
     
     col_l1, col_l2 = st.columns([1, 2.5])
     with col_l1:
@@ -546,6 +542,6 @@ with tab4:
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888; font-size: 0.85rem; padding: 1rem;">
-    ⚡ <b>Física Visual: Energia e Dinâmica</b> — Simulações otimizadas com motor gráfico nativo.
+    ⚡ <b>Física Visual: Energia e Dinâmica</b> — Simulações otimizadas com equações físicas integradas.
 </div>
 """, unsafe_allow_html=True)

@@ -197,7 +197,7 @@ def gerar_figura_massa_mola(massa, k_mola, amplitude, duracao_ms):
     return fig
 
 # ============================================
-# GERAÇÃO DE FIGURAS: ABA 3 (RAMPA + MOLA - CORRIGIDO SEM PISCAR)
+# GERAÇÃO DE FIGURAS: ABA 3 (RAMPA + MOLA)
 # ============================================
 def gerar_figura_rampa_mola_ref(massa, h_max, k_mola, duracao_ms, gravidade=10):
     em_total = massa * gravidade * h_max
@@ -290,32 +290,33 @@ def gerar_figura_rampa_mola_ref(massa, h_max, k_mola, duracao_ms, gravidade=10):
 # ============================================
 # GERAÇÃO DE FIGURAS: ABA 4 (BRINQUEDO LOOPING - CORRIGIDO)
 # ============================================
-def gerar_figura_looping_animado(massa, raio_loop, v_inicial, duracao_ms, gravidade=10):
+def gerar_figura_looping_corrigido(massa, raio_loop, v_inicial, duracao_ms, gravidade=10):
     em_total = 0.5 * massa * (v_inicial**2) # Energia mecânica inicial (potencial no solo = 0)
     v_min_topo = math.sqrt(raio_loop * gravidade)
     topo_loop_y = 2 * raio_loop
     
-    # Altura máxima teórica que a energia mecânica permite atingir: m*g*h_max = Em => h_max = Em / (m*g) = v_inicial^2 / (2*g)
     h_max_energia = (v_inicial**2) / (2 * gravidade)
     consegue_passar = h_max_energia >= topo_loop_y
 
     fig = make_subplots(rows=1, cols=2, column_widths=[0.68, 0.32], horizontal_spacing=0.08)
 
-    # Geometria da Pista do Looping
-    # 1. Pista de entrada em linha reta horizontal (y = 0) de x = -4 até x = raio_loop (onde começa o loop)
-    x_linha = np.linspace(-4.0, raio_loop, 40)
+    # Geometria da Pista do Looping:
+    # Centro do loop em (raio_loop, raio_loop)
+    # Linha reta inicial de x = -5.0 até o início da base do loop em x = raio_loop, y = 0
+    x_linha = np.linspace(-5.0, raio_loop, 40)
     y_linha = np.zeros(40)
 
-    # 2. Circunferência do Loop (Centro em (raio_loop, raio_loop), raio = raio_loop)
-    theta_loop = np.linspace(-np.pi, np.pi, 100)
+    # Circunferência completa do Loop (theta de pi até -pi descendente para subir pelo lado direito)
+    # Centro = (raio_loop, raio_loop)
+    theta_loop = np.linspace(np.pi, -np.pi, 120)
     x_loop = raio_loop + raio_loop * np.sin(theta_loop)
     y_loop = raio_loop + raio_loop * np.cos(theta_loop)
 
-    # Trace 0: Pista (Linha reta + Loop)
+    # Trace 0: Pista completa (Linha reta + Loop)
     fig.add_trace(go.Scatter(x=np.concatenate([x_linha, x_loop]), y=np.concatenate([y_linha, y_loop]), mode='lines', line=dict(color='#7f8c8d', width=4), hoverinfo='skip'), row=1, col=1)
 
-    # Estado Inicial (Carrinho no início da linha reta, x = -4, y = 0)
-    cx_ini, cy_ini = criar_bloco(-4.0, 0.0, 0.6, 0.6)
+    # Estado Inicial (Carrinho no início da linha reta, x = -5.0, y = 0)
+    cx_ini, cy_ini = criar_bloco(-5.0, 0.0, 0.6, 0.6)
     
     # Trace 1: Carrinho
     fig.add_trace(go.Scatter(x=cx_ini, y=cy_ini, fill="toself", fillcolor="#e74c3c", line=dict(color="#c0392b", width=2), hoverinfo='skip'), row=1, col=1)
@@ -323,28 +324,25 @@ def gerar_figura_looping_animado(massa, raio_loop, v_inicial, duracao_ms, gravid
     # Trace 2: Barras de Energia Iniciais (Só cinética na linha reta)
     fig.add_trace(go.Bar(x=['Ec', 'Epg', 'Em'], y=[em_total, 0.0, em_total], marker_color=[COR_EC, COR_EPG, COR_EM], text=[f"{em_total:.1f}J", f"0.0J", f"{em_total:.1f}J"], textposition='auto'), row=1, col=2)
 
-    # Construção dos Frames da Análise de Movimento do Looping
     frames = []
     n_q = 40
     
-    # Fase 1: Movimento na linha reta horizontal (x de -4 até raio_loop)
-    passos_linha = np.linspace(-4.0, raio_loop, n_q)
+    # Fase 1: Movimento na linha reta horizontal (x de -5.0 até raio_loop)
+    passos_linha = np.linspace(-5.0, raio_loop, n_q)
     
     # Fase 2: Movimento no Loop
-    # Ângulo theta vai de -pi (base do loop) até onde a energia permitir ou completar a volta (pi)
-    # Se h_max_energia < topo_loop_y, ele sobe até um ângulo máximo e volta.
+    # theta vai de pi (base inferior) descendo para pi/2 (lado direito), 0 (topo), -pi/2 (lado esquerdo) até -pi
     if consegue_passar:
-        passos_theta = np.linspace(-np.pi, np.pi, n_q * 2)
+        passos_theta = np.linspace(np.pi, -np.pi, n_q * 3)
     else:
-        # Ângulo máximo que atinge altura h_max_energia: y = raio_loop * (1 + cos(theta)) = h_max_energia
-        # cos(theta_max) = (h_max_energia / raio_loop) - 1
+        # Se não tiver energia suficiente, sobe até a altura máxima e desce de volta pelo mesmo lado
         cos_limite = min(1.0, max(-1.0, (h_max_energia / raio_loop) - 1))
-        theta_max = math.acos(cos_limite) # theta vai de -pi até -pi + theta_max (ou similar)
-        # Mais simples: simular com base na altura atingida
-        passos_theta = np.concatenate([np.linspace(-np.pi, 0, n_q), np.linspace(0, -np.pi, n_q)])
+        # Ângulo correspondente à altura máxima atingível
+        theta_limite = math.acos(cos_limite)
+        passos_theta = np.concatenate([np.linspace(np.pi, np.pi - theta_limite, n_q), np.linspace(np.pi - theta_limite, np.pi, n_q)])
 
     for ciclo in range(3):
-        # Parte 1: Na linha reta horizontal
+        # Parte 1: Linha reta (apenas Energia Cinética, Epg = 0)
         for x_a in passos_linha:
             y_a = 0.0
             ec = em_total
@@ -360,12 +358,11 @@ def gerar_figura_looping_animado(massa, raio_loop, v_inicial, duracao_ms, gravid
                 name=f"linha_{x_a}"
             ))
 
-        # Parte 2: No Looping
+        # Parte 2: Entrando e subindo pelo loop (conversão progressiva em Energia Potencial Gravitacional)
         for th in passos_theta:
             x_a = raio_loop + raio_loop * math.sin(th)
             y_a = raio_loop + raio_loop * math.cos(th)
             
-            # Garantir que não ultrapasse a altura máxima permitida pela energia mecânica
             if y_a > h_max_energia:
                 y_a = h_max_energia
             
@@ -397,7 +394,7 @@ def gerar_figura_looping_animado(massa, raio_loop, v_inicial, duracao_ms, gravid
             ]
         }]
     )
-    fig.update_xaxes(range=[-5, raio_loop * 3], showgrid=False, zeroline=False, visible=False, row=1, col=1)
+    fig.update_xaxes(range=[-6, raio_loop * 3], showgrid=False, zeroline=False, visible=False, row=1, col=1)
     fig.update_yaxes(range=[-1, max(4.0, (2 * raio_loop) + 1.5)], showgrid=False, zeroline=False, visible=False, row=1, col=1)
     fig.update_yaxes(range=[0, max(10.0, em_total * 1.2)], title="Energia (Joules)", row=1, col=2)
     return fig, h_max_energia, v_min_topo, consegue_passar
@@ -506,14 +503,13 @@ with tab3:
         st.plotly_chart(fig_rm, use_container_width=True, config={'displayModeBar': False})
 
 # ============================================
-# ABA 4: BRINQUEDO LOOPING (CORRIGIDO)
+# ABA 4: BRINQUEDO LOOPING (CORRIGIDO TRAJETÓRIA)
 # ============================================
 with tab4:
     st.markdown("""
     <div class="concept-card" style="border-left-color: #e74c3c;">
-        <b>Princípio do Looping:</b> O carrinho começa em linha reta horizontal com velocidade inicial $v_0$ (energia exclusivamente cinética). 
-        Ao entrar no loop, ele sobe, convertendo parte da energia em potencial gravitacional no topo. 
-        Ajuste a velocidade inicial e o raio para ver se ele completa a volta!
+        <b>Princípio do Looping:</b> O carrinho inicia o movimento em linha reta horizontal com velocidade inicial $v_0$ (energia puramente cinética, altura zero). 
+        Em seguida, entra na base do loop, sobe pela parte inicial, atinge o topo (convertendo energia cinética em potencial gravitacional) e completa a volta.
     </div>
     """, unsafe_allow_html=True)
     
@@ -533,18 +529,18 @@ with tab4:
         st.markdown("</div>", unsafe_allow_html=True)
 
     with col_l2:
-        fig_l, h_max_eng, v_min_topo, viavel = gerar_figura_looping_animado(massa_l, raio_l, v_ini_l, st.session_state.velocidade_ms)
+        fig_l, h_max_eng, v_min_topo, viavel = gerar_figura_looping_corrigido(massa_l, raio_l, v_ini_l, st.session_state.velocidade_ms)
         st.plotly_chart(fig_l, use_container_width=True, config={'displayModeBar': False})
         
         st.subheader("📊 Relatório de Viabilidade do Looping")
         col_r1, col_r2 = st.columns(2)
-        col_r1.metric("Altura Máxima Atingível ($h_{max}$)", f"{h_max_eng:.2f} m", help="Calculada puramente pela energia cinética inicial.")
+        col_r1.metric("Altura Máxima Atingível ($h_{max}$)", f"{h_max_eng:.2f} m", help="Calculada puramente pela conversão total da energia cinética inicial.")
         col_r2.metric("Altura do Topo do Loop", f"{2 * raio_l:.2f} m")
         
         if viavel:
-            st.success("✅ **Trajetória Viável!** O carrinho possui energia cinética suficiente para subir o loop, atingir o topo e completar a volta com segurança.")
+            st.success("✅ **Trajetória Viável!** O carrinho possui velocidade e energia suficientes para percorrer a linha reta, subir o loop, passar pelo topo com segurança e completar a volta.")
         else:
-            st.error("❌ **Trajetória Inviável!** A velocidade inicial é muito baixa. O carrinho não tem energia suficiente para alcançar o topo do looping e acabará descendo de ré antes de completá-lo.")
+            st.error("❌ **Trajetória Inviável!** A velocidade inicial é insuficiente para o raio do looping escolhido. O carrinho não alcançará o topo e retornará antes de completar a volta.")
 
 # Rodapé
 st.markdown("---")

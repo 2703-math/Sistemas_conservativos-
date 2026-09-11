@@ -55,7 +55,7 @@ COR_EPE = "#2ecc71"  # Potencial Elástica (Verde)
 COR_EM = "#34495e"   # Mecânica (Cinza Escuro)
 
 # ============================================
-# FUNÇÕES AUXILIARES DE DESENHO ESTÁVEL
+# FUNÇÕES AUXILIARES DE DESENHO
 # ============================================
 def criar_mola(x0, x1, y0, n_voltas=12, largura=0.35):
     if x0 >= x1:
@@ -90,7 +90,6 @@ def gerar_figura_rampa_u(massa, altura_max, duracao_ms, gravidade=10):
     x_pista = np.linspace(-x_max, x_max, 80)
     y_pista = k_rampa * (x_pista**2)
     fig.add_trace(go.Scatter(x=x_pista, y=y_pista, mode='lines', line=dict(color='#7f8c8d', width=4), hoverinfo='skip'), row=1, col=1)
-
     fig.add_trace(go.Scatter(x=[x_max], y=[k_rampa*(x_max**2) + 0.3], mode='markers', marker=dict(color='#e74c3c', size=22, line=dict(color='#c0392b', width=2)), hoverinfo='skip'), row=1, col=1)
 
     epg_ini = massa * gravidade * (k_rampa*(x_max**2))
@@ -125,16 +124,8 @@ def gerar_figura_rampa_u(massa, altura_max, duracao_ms, gravidade=10):
             "showactive": False,
             "x": 0.0, "y": 1.15,
             "buttons": [
-                {
-                    "label": "▶ Play",
-                    "method": "animate",
-                    "args": [None, {"frame": {"duration": duracao_ms, "redraw": True}, "fromcurrent": True, "transition": {"duration": 0}, "mode": "immediate"}]
-                },
-                {
-                    "label": "❚❚ Pause",
-                    "method": "animate",
-                    "args": [[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate", "transition": {"duration": 0}}]
-                }
+                {"label": "▶ Play", "method": "animate", "args": [None, {"frame": {"duration": duracao_ms, "redraw": True}, "fromcurrent": True, "transition": {"duration": 0}, "mode": "immediate"}]},
+                {"label": "❚❚ Pause", "method": "animate", "args": [[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate", "transition": {"duration": 0}}]}
             ]
         }]
     )
@@ -195,16 +186,8 @@ def gerar_figura_massa_mola(massa, k_mola, amplitude, duracao_ms):
             "showactive": False,
             "x": 0.0, "y": 1.15,
             "buttons": [
-                {
-                    "label": "▶ Play",
-                    "method": "animate",
-                    "args": [None, {"frame": {"duration": duracao_ms, "redraw": True}, "fromcurrent": True, "transition": {"duration": 0}, "mode": "immediate"}]
-                },
-                {
-                    "label": "❚❚ Pause",
-                    "method": "animate",
-                    "args": [[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate", "transition": {"duration": 0}}]
-                }
+                {"label": "▶ Play", "method": "animate", "args": [None, {"frame": {"duration": duracao_ms, "redraw": True}, "fromcurrent": True, "transition": {"duration": 0}, "mode": "immediate"}]},
+                {"label": "❚❚ Pause", "method": "animate", "args": [[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate", "transition": {"duration": 0}}]}
             ]
         }]
     )
@@ -214,7 +197,7 @@ def gerar_figura_massa_mola(massa, k_mola, amplitude, duracao_ms):
     return fig
 
 # ============================================
-# GERAÇÃO DE FIGURAS: ABA 3 (RAMPA + MOLA - CORRIGIDO)
+# GERAÇÃO DE FIGURAS: ABA 3 (RAMPA + MOLA - CORRIGIDO SEM PISCAR)
 # ============================================
 def gerar_figura_rampa_mola_ref(massa, h_max, k_mola, duracao_ms, gravidade=10):
     em_total = massa * gravidade * h_max
@@ -222,32 +205,24 @@ def gerar_figura_rampa_mola_ref(massa, h_max, k_mola, duracao_ms, gravidade=10):
 
     fig = make_subplots(rows=1, cols=2, column_widths=[0.68, 0.32], horizontal_spacing=0.08)
 
-    # Coordenadas geométricas do sistema da imagem
     x_topo_rampa = -6.0
     x_base_rampa = -2.0
     x_inicio_mola = 2.0
     x_parede = x_inicio_mola + 3.0
 
-    # Trace 0: Pista (Rampa inclinada + trecho plano)
     xr = np.linspace(x_topo_rampa, x_base_rampa, 30)
     yr = h_max * ((xr - x_base_rampa) / (x_topo_rampa - x_base_rampa))**2
     
     xp = np.concatenate([xr, np.linspace(x_base_rampa, x_parede, 40)])
     yp = np.concatenate([yr, np.zeros(40)])
     fig.add_trace(go.Scatter(x=xp, y=yp, mode='lines', line=dict(color='#7f8c8d', width=4), hoverinfo='skip'), row=1, col=1)
-    
-    # Trace 1: Parede fixa da mola
     fig.add_trace(go.Scatter(x=[x_parede, x_parede], y=[0, 1.8], mode='lines', line=dict(color='#95a5a6', width=6), hoverinfo='skip'), row=1, col=1)
 
-    # Estado Inicial (no topo da rampa)
     bx_ini, by_ini = criar_bloco(x_topo_rampa, h_max, 0.7, 0.7)
     xm_ini, ym_ini = criar_mola(x_inicio_mola, x_parede, 0.35, 12)
 
-    # Trace 2: Mola
     fig.add_trace(go.Scatter(x=xm_ini, y=ym_ini, mode='lines', line=dict(color='#2ecc71', width=3), hoverinfo='skip'), row=1, col=1)
-    # Trace 3: Bloco
     fig.add_trace(go.Scatter(x=bx_ini, y=by_ini, fill="toself", fillcolor="#e74c3c", line=dict(color="#c0392b", width=2), hoverinfo='skip'), row=1, col=1)
-    # Trace 4: Barras de Energia
     fig.add_trace(go.Bar(x=['Ec', 'Epg', 'Epe', 'Em'], y=[0.0, em_total, 0.0, em_total], marker_color=[COR_EC, COR_EPG, COR_EPE, COR_EM], text=[f"0.0J", f"{em_total:.1f}J", f"0.0J", f"{em_total:.1f}J"], textposition='auto'), row=1, col=2)
 
     frames = []
@@ -288,7 +263,7 @@ def gerar_figura_rampa_mola_ref(massa, h_max, k_mola, duracao_ms, gravidade=10):
                     go.Scatter(x=bx_f, y=by_f),
                     go.Bar(y=[ec, epg, epe, em_total], text=[f"{ec:.1f}J", f"{epg:.1f}J", f"{epe:.1f}J", f"{em_total:.1f}J"])
                 ],
-                traces=[2, 3, 4],  # Índices exatos correspondentes a Mola (2), Bloco (3) e Gráfico de Barras (4)
+                traces=[2, 3, 4],
                 name=f"x_{x_a}"
             ))
 
@@ -302,16 +277,8 @@ def gerar_figura_rampa_mola_ref(massa, h_max, k_mola, duracao_ms, gravidade=10):
             "showactive": False,
             "x": 0.0, "y": 1.15,
             "buttons": [
-                {
-                    "label": "▶ Play",
-                    "method": "animate",
-                    "args": [None, {"frame": {"duration": duracao_ms, "redraw": True}, "fromcurrent": True, "transition": {"duration": 0}, "mode": "immediate"}]
-                },
-                {
-                    "label": "❚❚ Pause",
-                    "method": "animate",
-                    "args": [[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate", "transition": {"duration": 0}}]
-                }
+                {"label": "▶ Play", "method": "animate", "args": [None, {"frame": {"duration": duracao_ms, "redraw": True}, "fromcurrent": True, "transition": {"duration": 0}, "mode": "immediate"}]},
+                {"label": "❚❚ Pause", "method": "animate", "args": [[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate", "transition": {"duration": 0}}]}
             ]
         }]
     )
@@ -321,31 +288,119 @@ def gerar_figura_rampa_mola_ref(massa, h_max, k_mola, duracao_ms, gravidade=10):
     return fig
 
 # ============================================
-# GERAÇÃO DE FIGURAS: ABA 4 (BRINQUEDO LOOPING)
+# GERAÇÃO DE FIGURAS: ABA 4 (BRINQUEDO LOOPING - CORRIGIDO)
 # ============================================
-def gerar_figura_looping(massa, raio_loop, v_inicial, alt_lancamento, gravidade=10):
-    h_0 = alt_lancamento + (v_inicial**2) / (2 * gravidade)
+def gerar_figura_looping_animado(massa, raio_loop, v_inicial, duracao_ms, gravidade=10):
+    em_total = 0.5 * massa * (v_inicial**2) # Energia mecânica inicial (potencial no solo = 0)
     v_min_topo = math.sqrt(raio_loop * gravidade)
     topo_loop_y = 2 * raio_loop
-    consegue_passar = h_0 >= topo_loop_y
     
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=[-5, 0], y=[alt_lancamento, 0], mode='lines', line=dict(color='#7f8c8d', width=4), hoverinfo='skip'))
-    
-    theta_loop = np.linspace(0, 2*np.pi, 100)
+    # Altura máxima teórica que a energia mecânica permite atingir: m*g*h_max = Em => h_max = Em / (m*g) = v_inicial^2 / (2*g)
+    h_max_energia = (v_inicial**2) / (2 * gravidade)
+    consegue_passar = h_max_energia >= topo_loop_y
+
+    fig = make_subplots(rows=1, cols=2, column_widths=[0.68, 0.32], horizontal_spacing=0.08)
+
+    # Geometria da Pista do Looping
+    # 1. Pista de entrada em linha reta horizontal (y = 0) de x = -4 até x = raio_loop (onde começa o loop)
+    x_linha = np.linspace(-4.0, raio_loop, 40)
+    y_linha = np.zeros(40)
+
+    # 2. Circunferência do Loop (Centro em (raio_loop, raio_loop), raio = raio_loop)
+    theta_loop = np.linspace(-np.pi, np.pi, 100)
     x_loop = raio_loop + raio_loop * np.sin(theta_loop)
     y_loop = raio_loop + raio_loop * np.cos(theta_loop)
-    fig.add_trace(go.Scatter(x=x_loop, y=y_loop, mode='lines', line=dict(color='#3498db', width=4), hoverinfo='skip'))
+
+    # Trace 0: Pista (Linha reta + Loop)
+    fig.add_trace(go.Scatter(x=np.concatenate([x_linha, x_loop]), y=np.concatenate([y_linha, y_loop]), mode='lines', line=dict(color='#7f8c8d', width=4), hoverinfo='skip'), row=1, col=1)
+
+    # Estado Inicial (Carrinho no início da linha reta, x = -4, y = 0)
+    cx_ini, cy_ini = criar_bloco(-4.0, 0.0, 0.6, 0.6)
+    
+    # Trace 1: Carrinho
+    fig.add_trace(go.Scatter(x=cx_ini, y=cy_ini, fill="toself", fillcolor="#e74c3c", line=dict(color="#c0392b", width=2), hoverinfo='skip'), row=1, col=1)
+
+    # Trace 2: Barras de Energia Iniciais (Só cinética na linha reta)
+    fig.add_trace(go.Bar(x=['Ec', 'Epg', 'Em'], y=[em_total, 0.0, em_total], marker_color=[COR_EC, COR_EPG, COR_EM], text=[f"{em_total:.1f}J", f"0.0J", f"{em_total:.1f}J"], textposition='auto'), row=1, col=2)
+
+    # Construção dos Frames da Análise de Movimento do Looping
+    frames = []
+    n_q = 40
+    
+    # Fase 1: Movimento na linha reta horizontal (x de -4 até raio_loop)
+    passos_linha = np.linspace(-4.0, raio_loop, n_q)
+    
+    # Fase 2: Movimento no Loop
+    # Ângulo theta vai de -pi (base do loop) até onde a energia permitir ou completar a volta (pi)
+    # Se h_max_energia < topo_loop_y, ele sobe até um ângulo máximo e volta.
+    if consegue_passar:
+        passos_theta = np.linspace(-np.pi, np.pi, n_q * 2)
+    else:
+        # Ângulo máximo que atinge altura h_max_energia: y = raio_loop * (1 + cos(theta)) = h_max_energia
+        # cos(theta_max) = (h_max_energia / raio_loop) - 1
+        cos_limite = min(1.0, max(-1.0, (h_max_energia / raio_loop) - 1))
+        theta_max = math.acos(cos_limite) # theta vai de -pi até -pi + theta_max (ou similar)
+        # Mais simples: simular com base na altura atingida
+        passos_theta = np.concatenate([np.linspace(-np.pi, 0, n_q), np.linspace(0, -np.pi, n_q)])
+
+    for ciclo in range(3):
+        # Parte 1: Na linha reta horizontal
+        for x_a in passos_linha:
+            y_a = 0.0
+            ec = em_total
+            epg = 0.0
+            
+            cx_f, cy_f = criar_bloco(x_a, y_a, 0.6, 0.6)
+            frames.append(go.Frame(
+                data=[
+                    go.Scatter(x=cx_f, y=cy_f),
+                    go.Bar(y=[ec, epg, em_total], text=[f"{ec:.1f}J", f"{epg:.1f}J", f"{em_total:.1f}J"])
+                ],
+                traces=[1, 2],
+                name=f"linha_{x_a}"
+            ))
+
+        # Parte 2: No Looping
+        for th in passos_theta:
+            x_a = raio_loop + raio_loop * math.sin(th)
+            y_a = raio_loop + raio_loop * math.cos(th)
+            
+            # Garantir que não ultrapasse a altura máxima permitida pela energia mecânica
+            if y_a > h_max_energia:
+                y_a = h_max_energia
+            
+            epg = massa * gravidade * y_a
+            ec = max(0.0, em_total - epg)
+
+            cx_f, cy_f = criar_bloco(x_a, y_a, 0.6, 0.6)
+            frames.append(go.Frame(
+                data=[
+                    go.Scatter(x=cx_f, y=cy_f),
+                    go.Bar(y=[ec, epg, em_total], text=[f"{ec:.1f}J", f"{epg:.1f}J", f"{em_total:.1f}J"])
+                ],
+                traces=[1, 2],
+                name=f"loop_{th}"
+            ))
+
+    fig.frames = frames
 
     fig.update_layout(
-        title=dict(text="Esquema da Trajetória no Looping", font=dict(size=16)),
         showlegend=False, plot_bgcolor='white', paper_bgcolor='white',
-        margin=dict(l=10, r=10, t=40, b=10), height=400
+        margin=dict(l=10, r=10, t=40, b=10), height=400,
+        updatemenus=[{
+            "type": "buttons",
+            "showactive": False,
+            "x": 0.0, "y": 1.15,
+            "buttons": [
+                {"label": "▶ Play", "method": "animate", "args": [None, {"frame": {"duration": duracao_ms, "redraw": True}, "fromcurrent": True, "transition": {"duration": 0}, "mode": "immediate"}]},
+                {"label": "❚❚ Pause", "method": "animate", "args": [[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate", "transition": {"duration": 0}}]}
+            ]
+        }]
     )
-    fig.update_xaxes(range=[-6, raio_loop * 3], showgrid=True, zeroline=True)
-    fig.update_yaxes(range=[-1, max(4.0, topo_loop_y + 1.5)], showgrid=True, zeroline=True)
-    
-    return fig, h_0, v_min_topo, consegue_passar
+    fig.update_xaxes(range=[-5, raio_loop * 3], showgrid=False, zeroline=False, visible=False, row=1, col=1)
+    fig.update_yaxes(range=[-1, max(4.0, (2 * raio_loop) + 1.5)], showgrid=False, zeroline=False, visible=False, row=1, col=1)
+    fig.update_yaxes(range=[0, max(10.0, em_total * 1.2)], title="Energia (Joules)", row=1, col=2)
+    return fig, h_max_energia, v_min_topo, consegue_passar
 
 # ============================================
 # TÍTULO E NAVEGAÇÃO POR ABAS SUPERIORES
@@ -451,13 +506,14 @@ with tab3:
         st.plotly_chart(fig_rm, use_container_width=True, config={'displayModeBar': False})
 
 # ============================================
-# ABA 4: BRINQUEDO LOOPING
+# ABA 4: BRINQUEDO LOOPING (CORRIGIDO)
 # ============================================
 with tab4:
     st.markdown("""
     <div class="concept-card" style="border-left-color: #e74c3c;">
-        <b>Princípio do Looping:</b> Para que o carrinho complete a volta sem cair, a velocidade no ponto mais alto deve superar 
-        o limiar físico $v = \\sqrt{R \\cdot g}$. Verifique a viabilidade em tempo real alterando os parâmetros abaixo.
+        <b>Princípio do Looping:</b> O carrinho começa em linha reta horizontal com velocidade inicial $v_0$ (energia exclusivamente cinética). 
+        Ao entrar no loop, ele sobe, convertendo parte da energia em potencial gravitacional no topo. 
+        Ajuste a velocidade inicial e o raio para ver se ele completa a volta!
     </div>
     """, unsafe_allow_html=True)
     
@@ -466,23 +522,29 @@ with tab4:
         st.markdown("<div class='param-box'>", unsafe_allow_html=True)
         massa_l = st.slider("Massa do carrinho (kg)", 0.1, 5.0, 1.0, step=0.1, key='m_l')
         raio_l = st.slider("Raio do Looping (R)", 0.5, 3.0, 1.0, step=0.25, key='r_l')
-        alt_l = st.slider("Altura de lançamento (h)", 0.0, 5.0, 2.5, step=0.25, key='alt_l')
-        v_ini_l = st.slider("Velocidade inicial ($v_0$)", 0.0, 10.0, 0.0, step=0.5, key='v_ini_l')
+        v_ini_l = st.slider("Velocidade inicial ($v_0$)", 1.0, 15.0, 6.0, step=0.5, key='v_ini_l')
+        
+        col_bl1, col_bl2 = st.columns(2)
+        if col_bl1.button("⏩ Mais Rápido", key='fast_l'):
+            st.session_state.velocidade_ms = max(5, st.session_state.velocidade_ms - 10)
+        if col_bl2.button("⏪ Mais Lento", key='slow_l'):
+            st.session_state.velocidade_ms = min(100, st.session_state.velocidade_ms + 10)
+        st.markdown(f"<b>Velocidade atual:</b> {st.session_state.velocidade_ms} ms/quadro", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
     with col_l2:
-        fig_l, h_total, v_min_topo, viavel = gerar_figura_looping(massa_l, raio_l, v_ini_l, alt_l)
+        fig_l, h_max_eng, v_min_topo, viavel = gerar_figura_looping_animado(massa_l, raio_l, v_ini_l, st.session_state.velocidade_ms)
         st.plotly_chart(fig_l, use_container_width=True, config={'displayModeBar': False})
         
         st.subheader("📊 Relatório de Viabilidade do Looping")
         col_r1, col_r2 = st.columns(2)
-        col_r1.metric("Altura Total Equivalente ($h_0$)", f"{h_total:.2f} m")
-        col_r2.metric("Velocidade Mínima no Topo", f"{v_min_topo:.2f} m/s")
+        col_r1.metric("Altura Máxima Atingível ($h_{max}$)", f"{h_max_eng:.2f} m", help="Calculada puramente pela energia cinética inicial.")
+        col_r2.metric("Altura do Topo do Loop", f"{2 * raio_l:.2f} m")
         
         if viavel:
-            st.success("✅ **Trajetória Viável!** O carrinho possui energia mecânica suficiente para completar o looping com segurança.")
+            st.success("✅ **Trajetória Viável!** O carrinho possui energia cinética suficiente para subir o loop, atingir o topo e completar a volta com segurança.")
         else:
-            st.error("❌ **Trajetória Inviável!** O carrinho não atingirá o topo com velocidade suficiente e perderá o contato com a pista.")
+            st.error("❌ **Trajetória Inviável!** A velocidade inicial é muito baixa. O carrinho não tem energia suficiente para alcançar o topo do looping e acabará descendo de ré antes de completá-lo.")
 
 # Rodapé
 st.markdown("---")

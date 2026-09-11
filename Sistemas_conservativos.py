@@ -58,7 +58,7 @@ COR_EM = "#34495e"   # Mecânica (Cinza Escuro)
 # ============================================
 # FUNÇÕES AUXILIARES DE DESENHO
 # ============================================
-def criar_mola(x0, x1, y0, n_voltas=10, largura=0.4):
+def criar_mola(x0, x1, y0, n_voltas=12, largura=0.35):
     if x0 >= x1:
         return [x0, x1], [y0, y0]
     x_vals = np.linspace(x0, x1, n_voltas * 2)
@@ -72,8 +72,15 @@ def criar_mola(x0, x1, y0, n_voltas=10, largura=0.4):
             y_vals[i] = y0 - largura
     return x_vals, y_vals
 
+def criar_bloco(x_centro, y_base, largura=0.8, altura=0.8):
+    """Retorna os vértices de um retângulo para desenhar o bloco de forma estável"""
+    hx = largura / 2
+    x = [x_centro - hx, x_centro + hx, x_centro + hx, x_centro - hx, x_centro - hx]
+    y = [y_base, y_base, y_base + altura, y_base + altura, y_base]
+    return x, y
+
 # ============================================
-# PLOTAGENS OTIMIZADAS PARA FLUIDEZ
+# PLOTAGENS ESTÁVEIS (SEM FLUTUAÇÃO DE EIXOS)
 # ============================================
 def plot_rampa_u(angulo_deg, massa, altura_max, gravidade=10):
     x_max = 5
@@ -87,7 +94,7 @@ def plot_rampa_u(angulo_deg, massa, altura_max, gravidade=10):
     epg = massa * gravidade * y_atual
     ec = max(0.0, em - epg)
     
-    fig = make_subplots(rows=1, cols=2, column_widths=[0.7, 0.3], horizontal_spacing=0.05)
+    fig = make_subplots(rows=1, cols=2, column_widths=[0.68, 0.32], horizontal_spacing=0.08)
     
     # Pista
     x_pista = np.linspace(-x_max, x_max, 80)
@@ -100,10 +107,10 @@ def plot_rampa_u(angulo_deg, massa, altura_max, gravidade=10):
     # Barras de Energia
     fig.add_trace(go.Bar(x=['Ec', 'Epg', 'Em'], y=[ec, epg, em], marker_color=[COR_EC, COR_EPG, COR_EM], text=[f"{ec:.1f}J", f"{epg:.1f}J", f"{em:.1f}J"], textposition='auto'), row=1, col=2)
     
-    fig.update_layout(showlegend=False, plot_bgcolor='white', margin=dict(l=10, r=10, t=20, b=10), height=380)
-    fig.update_xaxes(range=[-6, 6], showgrid=False, zeroline=False, visible=False, row=1, col=1)
-    fig.update_yaxes(range=[-1, altura_max + 2], showgrid=False, zeroline=False, visible=False, row=1, col=1)
-    fig.update_yaxes(range=[0, em * 1.15], title="Energia (Joules)", row=1, col=2)
+    fig.update_layout(showlegend=False, plot_bgcolor='white', paper_bgcolor='white', margin=dict(l=10, r=10, t=20, b=10), height=380)
+    fig.update_xaxes(range=[-6.5, 6.5], showgrid=False, zeroline=False, visible=False, row=1, col=1)
+    fig.update_yaxes(range=[-1, altura_max + 2.5], showgrid=False, zeroline=False, visible=False, row=1, col=1)
+    fig.update_yaxes(range=[0, max(10.0, em * 1.2)], title="Energia (Joules)", row=1, col=2)
     return fig
 
 def plot_massa_mola(angulo_deg, massa, k_mola, amplitude):
@@ -114,33 +121,49 @@ def plot_massa_mola(angulo_deg, massa, k_mola, amplitude):
     epe = 0.5 * k_mola * (x_atual**2)
     ec = max(0.0, em - epe)
     
-    fig = make_subplots(rows=1, cols=2, column_widths=[0.7, 0.3], horizontal_spacing=0.05)
+    fig = make_subplots(rows=1, cols=2, column_widths=[0.68, 0.32], horizontal_spacing=0.08)
     
-    # Base e Parede
-    fig.add_shape(type="rect", x0=-amplitude-3, y0=-0.8, x1=amplitude+2, y1=0, fillcolor="#bdc3c7", line=dict(width=0), row=1, col=1)
-    fig.add_shape(type="rect", x0=-amplitude-3, y0=0, x1=-amplitude-2.5, y1=1.8, fillcolor="#95a5a6", line=dict(width=0), row=1, col=1)
+    limite_x = amplitude + 3.5
+    
+    # Chão (usando Scatter preenchido em vez de shape)
+    fig.add_trace(go.Scatter(
+        x=[-limite_x, limite_x, limite_x, -limite_x, -limite_x],
+        y=[-0.8, -0.8, 0, 0, -0.8],
+        fill="toself", fillcolor="#bdc3c7", line=dict(width=0), hoverinfo='skip'
+    ), row=1, col=1)
+    
+    # Parede Vertical
+    fig.add_trace(go.Scatter(
+        x=[-limite_x, -limite_x + 0.4, -limite_x + 0.4, -limite_x, -limite_x],
+        y=[0, 0, 2.2, 2.2, 0],
+        fill="toself", fillcolor="#95a5a6", line=dict(width=0), hoverinfo='skip'
+    ), row=1, col=1)
     
     # Mola
-    x_mola, y_mola = criar_mola(-amplitude-2.5, x_atual - 0.4, 0.4, n_voltas=12)
-    fig.add_trace(go.Scatter(x=x_mola, y=y_mola, mode='lines', line=dict(color='#7f8c8d', width=2), hoverinfo='skip'), row=1, col=1)
+    x_mola, y_mola = criar_mola(-limite_x + 0.4, x_atual - 0.4, 0.4, n_voltas=12)
+    fig.add_trace(go.Scatter(x=x_mola, y=y_mola, mode='lines', line=dict(color='#7f8c8d', width=3), hoverinfo='skip'), row=1, col=1)
     
     # Bloco
-    fig.add_shape(type="rect", x0=x_atual-0.4, y0=0, x1=x_atual+0.4, y1=0.8, fillcolor="#3498db", line=dict(color="#2980b9", width=2), row=1, col=1)
+    bx, by = criar_bloco(x_atual, 0, largura=0.8, altura=0.8)
+    fig.add_trace(go.Scatter(
+        x=bx, y=by, fill="toself", fillcolor="#3498db",
+        line=dict(color="#2980b9", width=2), hoverinfo='skip'
+    ), row=1, col=1)
     
-    # Barras
+    # Barras de Energia
     fig.add_trace(go.Bar(x=['Ec', 'Epe', 'Em'], y=[ec, epe, em], marker_color=[COR_EC, COR_EPE, COR_EM], text=[f"{ec:.1f}J", f"{epe:.1f}J", f"{em:.1f}J"], textposition='auto'), row=1, col=2)
     
-    fig.update_layout(showlegend=False, plot_bgcolor='white', margin=dict(l=10, r=10, t=20, b=10), height=380)
-    fig.update_xaxes(range=[-amplitude-3, amplitude+2], showgrid=False, zeroline=False, visible=False, row=1, col=1)
-    fig.update_yaxes(range=[-1, 2.5], showgrid=False, zeroline=False, visible=False, row=1, col=1)
-    fig.update_yaxes(range=[0, em * 1.15], title="Energia (Joules)", row=1, col=2)
+    fig.update_layout(showlegend=False, plot_bgcolor='white', paper_bgcolor='white', margin=dict(l=10, r=10, t=20, b=10), height=380)
+    fig.update_xaxes(range=[-limite_x - 0.5, limite_x + 0.5], showgrid=False, zeroline=False, visible=False, row=1, col=1)
+    fig.update_yaxes(range=[-1.2, 2.8], showgrid=False, zeroline=False, visible=False, row=1, col=1)
+    fig.update_yaxes(range=[0, max(10.0, em * 1.2)], title="Energia (Joules)", row=1, col=2)
     return fig
 
 # ============================================
 # TÍTULO E NAVEGAÇÃO POR ABAS SUPERIORES
 # ============================================
 st.markdown('<div class="main-title">⚡ Sistemas Conservativos de Energia</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Acompanhe a transformação da energia mecânica em tempo real com alta fluidez</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Simulação interativa com renderização estável e fluida</div>', unsafe_allow_html=True)
 
 tab1, tab2 = st.tabs([
     "1. Rampa em 'U' (Gravitacional)", 
@@ -154,7 +177,7 @@ with tab1:
     st.markdown("""
     <div class="concept-card" style="border-left-color: #9b59b6;">
         <b>Princípio:</b> Ao descer a rampa, a esfera perde altura (perde Energia Potencial Gravitacional) e ganha velocidade (ganha Energia Cinética). 
-        A soma permanece constante na ausência de atrito!
+        A energia mecânica total permanece constante!
     </div>
     """, unsafe_allow_html=True)
     
@@ -166,7 +189,6 @@ with tab1:
         massa_u = st.slider("Massa da esfera (kg)", 1.0, 10.0, 2.0, step=0.5, key='mu')
         h_max_u = st.slider("Altura inicial (m)", 2.0, 10.0, 5.0, step=0.5, key='hu')
         
-        # Controle de estado para animação fluida sem travamento de loop pesado
         if 'animando_u' not in st.session_state:
             st.session_state.animando_u = False
             st.session_state.angulo_u = 0
@@ -180,14 +202,13 @@ with tab1:
         st.markdown("</div>", unsafe_allow_html=True)
 
     with col_c2:
-        # Placeholder único para atualizar o gráfico suavemente sem redesenhar a página inteira
         grafico_u = st.empty()
         fig_u = plot_rampa_u(st.session_state.angulo_u, massa_u, h_max_u)
-        grafico_u.plotly_chart(fig_u, use_container_width=True, config={'displayModeBar': False})
+        grafico_u.plotly_chart(fig_u, use_container_width=True, config={'displayModeBar': False, 'staticPlot': False})
         
         if st.session_state.animando_u:
-            st.session_state.angulo_u = (st.session_state.angulo_u + 8) % 360
-            time.sleep(0.02)
+            st.session_state.angulo_u = (st.session_state.angulo_u + 6) % 360
+            time.sleep(0.015)
             st.rerun()
 
 # ============================================
@@ -196,7 +217,7 @@ with tab1:
 with tab2:
     st.markdown("""
     <div class="concept-card" style="border-left-color: #2ecc71;">
-        <b>Princípio:</b> Ao comprimir a mola, acumulamos Energia Potencial Elástica. Ao soltar, a energia se converte em movimento (Energia Cinética).
+        <b>Princípio:</b> Ao comprimir a mola, acumulamos Energia Potencial Elástica. Ao soltar, ela se converte integralmente em Energia Cinética.
     </div>
     """, unsafe_allow_html=True)
     
@@ -224,17 +245,17 @@ with tab2:
     with col_m2:
         grafico_m = st.empty()
         fig_m = plot_massa_mola(st.session_state.angulo_m, massa_m, k_m, amp_m)
-        grafico_m.plotly_chart(fig_m, use_container_width=True, config={'displayModeBar': False})
+        grafico_m.plotly_chart(fig_m, use_container_width=True, config={'displayModeBar': False, 'staticPlot': False})
         
         if st.session_state.animando_m:
-            st.session_state.angulo_m = (st.session_state.angulo_m + 8) % 360
-            time.sleep(0.02)
+            st.session_state.angulo_m = (st.session_state.angulo_m + 6) % 360
+            time.sleep(0.015)
             st.rerun()
 
 # Rodapé
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888; font-size: 0.85rem; padding: 1rem;">
-    ⚡ <b>Física Visual: Energia</b> — Ferramenta educacional otimizada para alta fluidez interativa.
+    ⚡ <b>Física Visual: Energia</b> — Simulações otimizadas para alto desempenho pedagógico.
 </div>
 """, unsafe_allow_html=True)

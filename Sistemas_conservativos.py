@@ -78,9 +78,9 @@ def criar_bloco(x_centro, y_base, largura=0.8, altura=0.8):
     return x, y
 
 # ============================================
-# GERAÇÃO DE FIGURAS COM ANIMAÇÃO NATIVA (PLOTLY FRAMES)
+# GERAÇÃO DE FIGURAS COM LOOP E CONTROLE DE VELOCIDADE
 # ============================================
-def gerar_figura_rampa_u(massa, altura_max, gravidade=10):
+def gerar_figura_rampa_u(massa, altura_max, duracao_ms, gravidade=10):
     x_max = 5
     k_rampa = altura_max / (x_max**2)
     em = massa * gravidade * altura_max
@@ -92,7 +92,7 @@ def gerar_figura_rampa_u(massa, altura_max, gravidade=10):
     y_pista = k_rampa * (x_pista**2)
     fig.add_trace(go.Scatter(x=x_pista, y=y_pista, mode='lines', line=dict(color='#7f8c8d', width=4), hoverinfo='skip'), row=1, col=1)
 
-    # Trace 1: Esfera (Estado inicial em angulo = 0)
+    # Trace 1: Esfera (Estado inicial)
     fig.add_trace(go.Scatter(x=[x_max], y=[k_rampa*(x_max**2) + 0.3], mode='markers', marker=dict(color='#e74c3c', size=22, line=dict(color='#c0392b', width=2)), hoverinfo='skip'), row=1, col=1)
 
     # Trace 2: Barras de Energia
@@ -100,24 +100,25 @@ def gerar_figura_rampa_u(massa, altura_max, gravidade=10):
     ec_ini = max(0.0, em - epg_ini)
     fig.add_trace(go.Bar(x=['Ec', 'Epg', 'Em'], y=[ec_ini, epg_ini, em], marker_color=[COR_EC, COR_EPG, COR_EM], text=[f"{ec_ini:.1f}J", f"{epg_ini:.1f}J", f"{em:.1f}J"], textposition='auto'), row=1, col=2)
 
-    # Construção dos Quadros (Frames) para animação nativa
+    # Construção de múltiplos ciclos para garantir o loop contínuo nativo
     frames = []
-    angles = range(0, 360, 6)
-    for ang in angles:
-        theta = math.radians(ang)
-        x_a = x_max * math.cos(theta)
-        y_a = k_rampa * (x_a**2)
-        epg = massa * gravidade * y_a
-        ec = max(0.0, em - epg)
+    # 5 ciclos completos de repetição para simular loop contínuo fluido
+    for ciclo in range(5):
+        for ang in range(0, 360, 6):
+            theta = math.radians(ang)
+            x_a = x_max * math.cos(theta)
+            y_a = k_rampa * (x_a**2)
+            epg = massa * gravidade * y_a
+            ec = max(0.0, em - epg)
 
-        frames.append(go.Frame(
-            data=[
-                go.Scatter(x=[x_a], y=[y_a + 0.3]),
-                go.Bar(y=[ec, epg, em], text=[f"{ec:.1f}J", f"{epg:.1f}J", f"{em:.1f}J"])
-            ],
-            traces=[1, 2],
-            name=str(ang)
-        ))
+            frames.append(go.Frame(
+                data=[
+                    go.Scatter(x=[x_a], y=[y_a + 0.3]),
+                    go.Bar(y=[ec, epg, em], text=[f"{ec:.1f}J", f"{epg:.1f}J", f"{em:.1f}J"])
+                ],
+                traces=[1, 2],
+                name=f"c{ciclo}_a{ang}"
+            ))
 
     fig.frames = frames
 
@@ -132,7 +133,7 @@ def gerar_figura_rampa_u(massa, altura_max, gravidade=10):
                 {
                     "label": "▶ Play",
                     "method": "animate",
-                    "args": [None, {"frame": {"duration": 30, "redraw": True}, "fromcurrent": True, "transition": {"duration": 0}}]
+                    "args": [None, {"frame": {"duration": duracao_ms, "redraw": True}, "fromcurrent": True, "transition": {"duration": 0}, "mode": "immediate"}]
                 },
                 {
                     "label": "❚❚ Pause",
@@ -147,7 +148,7 @@ def gerar_figura_rampa_u(massa, altura_max, gravidade=10):
     fig.update_yaxes(range=[0, max(10.0, em * 1.2)], title="Energia (Joules)", row=1, col=2)
     return fig
 
-def gerar_figura_massa_mola(massa, k_mola, amplitude):
+def gerar_figura_massa_mola(massa, k_mola, amplitude, duracao_ms):
     em = 0.5 * k_mola * (amplitude**2)
     limite_x = amplitude + 3.5
 
@@ -158,7 +159,7 @@ def gerar_figura_massa_mola(massa, k_mola, amplitude):
     # Trace 1: Parede
     fig.add_trace(go.Scatter(x=[-limite_x, -limite_x + 0.4, -limite_x + 0.4, -limite_x, -limite_x], y=[0, 0, 2.2, 2.2, 0], fill="toself", fillcolor="#95a5a6", line=dict(width=0), hoverinfo='skip'), row=1, col=1)
 
-    # Estado Inicial (ang = 0 -> bloco na amplitude máxima esticada)
+    # Estado Inicial
     x_ini = amplitude
     xm, ym = criar_mola(-limite_x + 0.4, x_ini - 0.4, 0.4, n_voltas=12)
     bx, by = criar_bloco(x_ini, 0)
@@ -173,24 +174,24 @@ def gerar_figura_massa_mola(massa, k_mola, amplitude):
     fig.add_trace(go.Bar(x=['Ec', 'Epe', 'Em'], y=[ec_ini, epe_ini, em], marker_color=[COR_EC, COR_EPE, COR_EM], text=[f"{ec_ini:.1f}J", f"{epe_ini:.1f}J", f"{em:.1f}J"], textposition='auto'), row=1, col=2)
 
     frames = []
-    angles = range(0, 360, 6)
-    for ang in angles:
-        theta = math.radians(ang)
-        x_a = amplitude * math.cos(theta)
-        epe = 0.5 * k_mola * (x_a**2)
-        ec = max(0.0, em - epe)
-        xm_f, ym_f = criar_mola(-limite_x + 0.4, x_a - 0.4, 0.4, n_voltas=12)
-        bx_f, by_f = criar_bloco(x_a, 0)
+    for ciclo in range(5):
+        for ang in range(0, 360, 6):
+            theta = math.radians(ang)
+            x_a = amplitude * math.cos(theta)
+            epe = 0.5 * k_mola * (x_a**2)
+            ec = max(0.0, em - epe)
+            xm_f, ym_f = criar_mola(-limite_x + 0.4, x_a - 0.4, 0.4, n_voltas=12)
+            bx_f, by_f = criar_bloco(x_a, 0)
 
-        frames.append(go.Frame(
-            data=[
-                go.Scatter(x=xm_f, y=ym_f),
-                go.Scatter(x=bx_f, y=by_f),
-                go.Bar(y=[ec, epe, em], text=[f"{ec:.1f}J", f"{epe:.1f}J", f"{em:.1f}J"])
-            ],
-            traces=[2, 3, 4],
-            name=str(ang)
-        ))
+            frames.append(go.Frame(
+                data=[
+                    go.Scatter(x=xm_f, y=ym_f),
+                    go.Scatter(x=bx_f, y=by_f),
+                    go.Bar(y=[ec, epe, em], text=[f"{ec:.1f}J", f"{epe:.1f}J", f"{em:.1f}J"])
+                ],
+                traces=[2, 3, 4],
+                name=f"c{ciclo}_a{ang}"
+            ))
 
     fig.frames = frames
 
@@ -205,7 +206,7 @@ def gerar_figura_massa_mola(massa, k_mola, amplitude):
                 {
                     "label": "▶ Play",
                     "method": "animate",
-                    "args": [None, {"frame": {"duration": 30, "redraw": True}, "fromcurrent": True, "transition": {"duration": 0}}]
+                    "args": [None, {"frame": {"duration": duracao_ms, "redraw": True}, "fromcurrent": True, "transition": {"duration": 0}, "mode": "immediate"}]
                 },
                 {
                     "label": "❚❚ Pause",
@@ -223,9 +224,12 @@ def gerar_figura_massa_mola(massa, k_mola, amplitude):
 # ============================================
 # TÍTULO E NAVEGAÇÃO POR ABAS SUPERIORES
 # ============================================
-markdown_title = '<div class="main-title">⚡ Sistemas Conservativos de Energia</div>'
-st.markdown(markdown_title, unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Simulação interativa com animação nativa fluida (sem piscar)</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">⚡ Sistemas Conservativos de Energia</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Animações em loop contínuo e controle de velocidade</div>', unsafe_allow_html=True)
+
+# Gerenciamento de estado para a velocidade (em milissegundos por quadro)
+if 'velocidade_ms' not in st.session_state:
+    st.session_state.velocidade_ms = 30  # valor padrão inicial
 
 tab1, tab2 = st.tabs([
     "1. Rampa em 'U' (Gravitacional)", 
@@ -238,8 +242,8 @@ tab1, tab2 = st.tabs([
 with tab1:
     st.markdown("""
     <div class="concept-card" style="border-left-color: #9b59b6;">
-        <b>Princípio:</b> Ao descer a rampa, a esfera perde altura (perde Energia Potencial Gravitacional) e ganha velocidade (ganha Energia Cinética). 
-        A energia mecânica total permanece constante! Clique em <b>▶ Play</b> no gráfico para iniciar.
+        <b>Princípio:</b> Ao descer a rampa, a esfera perde altura e ganha velocidade. 
+        Utilize os botões de velocidade abaixo e clique em <b>▶ Play</b> para ver o loop contínuo.
     </div>
     """, unsafe_allow_html=True)
     
@@ -250,10 +254,20 @@ with tab1:
         st.subheader("🎛️ Parâmetros")
         massa_u = st.slider("Massa da esfera (kg)", 1.0, 10.0, 2.0, step=0.5, key='mu')
         h_max_u = st.slider("Altura inicial (m)", 2.0, 10.0, 5.0, step=0.5, key='hu')
+        
+        st.markdown("---")
+        st.subheader("⏱️ Velocidade da Animação")
+        col_btn1, col_btn2 = st.columns(2)
+        if col_btn1.button("⏩ Mais Rápido", key='fast_u'):
+            st.session_state.velocidade_ms = max(5, st.session_state.velocidade_ms - 10)
+        if col_btn2.button("⏪ Mais Lento", key='slow_u'):
+            st.session_state.velocidade_ms = min(100, st.session_state.velocidade_ms + 10)
+        
+        st.markdown(f"<b>Velocidade atual:</b> {st.session_state.velocidade_ms} ms/quadro", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
     with col_c2:
-        fig_u = gerar_figura_rampa_u(massa_u, h_max_u)
+        fig_u = gerar_figura_rampa_u(massa_u, h_max_u, st.session_state.velocidade_ms)
         st.plotly_chart(fig_u, use_container_width=True, config={'displayModeBar': False})
 
 # ============================================
@@ -262,8 +276,8 @@ with tab1:
 with tab2:
     st.markdown("""
     <div class="concept-card" style="border-left-color: #2ecc71;">
-        <b>Princípio:</b> Na situação inicial, a mola está esticada na amplitude máxima acumulando Energia Potencial Elástica. 
-        Ao clicar em <b>▶ Play</b>, o bloco é solto e a energia se converte integralmente em movimento.
+        <b>Princípio:</b> O bloco oscila perpetuamente entre energia elástica e cinética. 
+        Ajuste a velocidade nos botões e clique em <b>▶ Play</b>.
     </div>
     """, unsafe_allow_html=True)
     
@@ -275,16 +289,26 @@ with tab2:
         massa_m = st.slider("Massa do bloco (kg)", 1.0, 10.0, 2.0, step=0.5, key='mm')
         k_m = st.slider("Constante elástica (N/m)", 10, 100, 50, step=10, key='km')
         amp_m = st.slider("Amplitude (m)", 1.0, 5.0, 3.0, step=0.5, key='ampm')
+        
+        st.markdown("---")
+        st.subheader("⏱️ Velocidade da Animação")
+        col_btnm1, col_btnm2 = st.columns(2)
+        if col_btnm1.button("⏩ Mais Rápido", key='fast_m'):
+            st.session_state.velocidade_ms = max(5, st.session_state.velocidade_ms - 10)
+        if col_btnm2.button("⏪ Mais Lento", key='slow_m'):
+            st.session_state.velocidade_ms = min(100, st.session_state.velocidade_ms + 10)
+            
+        st.markdown(f"<b>Velocidade atual:</b> {st.session_state.velocidade_ms} ms/quadro", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
     with col_m2:
-        fig_m = gerar_figura_massa_mola(massa_m, k_m, amp_m)
+        fig_m = gerar_figura_massa_mola(massa_m, k_m, amp_m, st.session_state.velocidade_ms)
         st.plotly_chart(fig_m, use_container_width=True, config={'displayModeBar': False})
 
 # Rodapé
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888; font-size: 0.85rem; padding: 1rem;">
-    ⚡ <b>Física Visual: Energia</b> — Simulações otimizadas com motor gráfico nativo.
+    ⚡ <b>Física Visual: Energia</b> — Simulações contínuas em loop com controle de velocidade.
 </div>
 """, unsafe_allow_html=True)

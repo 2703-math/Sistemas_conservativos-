@@ -1,14 +1,16 @@
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import math
+import time
 
 # ============================================
 # CONFIGURAÇÃO DA PÁGINA
 # ============================================
 st.set_page_config(
-    page_title="Função do 2º Grau Interativa",
-    page_icon="🎢",
+    page_title="Física Visual: Energia",
+    page_icon="⚡",
     layout="wide"
 )
 
@@ -37,17 +39,6 @@ st.markdown("""
         border-left: 4px solid;
         margin-bottom: 1rem;
     }
-    .equation-box {
-        background: #1a1a2e;
-        color: #fff;
-        padding: 1rem;
-        border-radius: 10px;
-        text-align: center;
-        font-size: 1.5rem;
-        font-family: 'Courier New', monospace;
-        margin-bottom: 1rem;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
     .param-box {
         background: #fff;
         border: 2px solid #e0e0e0;
@@ -55,250 +46,195 @@ st.markdown("""
         padding: 1rem;
         margin-bottom: 1rem;
     }
-    .step-box {
-        background: #fff8e1;
-        border-radius: 10px;
-        padding: 1rem;
-        margin: 0.5rem 0;
-        border-left: 4px solid #ffc107;
-    }
 </style>
 """, unsafe_allow_html=True)
 
+# Cores padrão para as Energias
+COR_EC = "#3498db"   # Cinética (Azul)
+COR_EPG = "#9b59b6"  # Potencial Gravitacional (Roxo)
+COR_EPE = "#2ecc71"  # Potencial Elástica (Verde)
+COR_EM = "#34495e"   # Mecânica (Cinza Escuro)
+
 # ============================================
-# FUNÇÕES DE PLOTAGEM OTIMIZADAS (PLOTLY)
+# FUNÇÕES AUXILIARES DE DESENHO
 # ============================================
-def criar_layout_cartesiano(fig, title="Plano Cartesiano", y_range=[-15, 15]):
-    fig.update_layout(
-        title=dict(text=title, font=dict(size=16)),
-        plot_bgcolor='#fafafa',
-        paper_bgcolor='white',
-        margin=dict(l=20, r=20, t=40, b=20),
-        height=500,
-        showlegend=True,
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(255,255,255,0.8)")
-    )
+def criar_mola(x0, x1, y0, n_voltas=10, largura=0.4):
+    if x0 >= x1:
+        return [x0, x1], [y0, y0]
+    x_vals = np.linspace(x0, x1, n_voltas * 2)
+    y_vals = np.zeros_like(x_vals)
+    for i in range(len(x_vals)):
+        if i == 0 or i == len(x_vals) - 1:
+            y_vals[i] = y0
+        elif i % 2 == 0:
+            y_vals[i] = y0 + largura
+        else:
+            y_vals[i] = y0 - largura
+    return x_vals, y_vals
+
+# ============================================
+# PLOTAGENS OTIMIZADAS PARA FLUIDEZ
+# ============================================
+def plot_rampa_u(angulo_deg, massa, altura_max, gravidade=10):
+    x_max = 5
+    k_rampa = altura_max / (x_max**2)
     
-    fig.update_xaxes(
-        range=[-10, 10], zeroline=True, zerolinewidth=2, zerolinecolor='#2c3e50',
-        gridcolor='#e0e0e0', dtick=1
-    )
+    theta = math.radians(angulo_deg)
+    x_atual = x_max * math.cos(theta)
+    y_atual = k_rampa * (x_atual**2)
     
-    fig.update_yaxes(
-        range=y_range, zeroline=True, zerolinewidth=2, zerolinecolor='#2c3e50',
-        gridcolor='#e0e0e0', dtick=2
-    )
+    em = massa * gravidade * altura_max
+    epg = massa * gravidade * y_atual
+    ec = max(0.0, em - epg)
+    
+    fig = make_subplots(rows=1, cols=2, column_widths=[0.7, 0.3], horizontal_spacing=0.05)
+    
+    # Pista
+    x_pista = np.linspace(-x_max, x_max, 80)
+    y_pista = k_rampa * (x_pista**2)
+    fig.add_trace(go.Scatter(x=x_pista, y=y_pista, mode='lines', line=dict(color='#7f8c8d', width=4), hoverinfo='skip'), row=1, col=1)
+    
+    # Esfera
+    fig.add_trace(go.Scatter(x=[x_atual], y=[y_atual + 0.3], mode='markers', marker=dict(color='#e74c3c', size=22, line=dict(color='#c0392b', width=2)), hoverinfo='skip'), row=1, col=1)
+    
+    # Barras de Energia
+    fig.add_trace(go.Bar(x=['Ec', 'Epg', 'Em'], y=[ec, epg, em], marker_color=[COR_EC, COR_EPG, COR_EM], text=[f"{ec:.1f}J", f"{epg:.1f}J", f"{em:.1f}J"], textposition='auto'), row=1, col=2)
+    
+    fig.update_layout(showlegend=False, plot_bgcolor='white', margin=dict(l=10, r=10, t=20, b=10), height=380)
+    fig.update_xaxes(range=[-6, 6], showgrid=False, zeroline=False, visible=False, row=1, col=1)
+    fig.update_yaxes(range=[-1, altura_max + 2], showgrid=False, zeroline=False, visible=False, row=1, col=1)
+    fig.update_yaxes(range=[0, em * 1.15], title="Energia (Joules)", row=1, col=2)
     return fig
 
-def plot_parabola(a, b, c, mostrar_raizes=False, mostrar_vertice=False):
-    fig = go.Figure()
+def plot_massa_mola(angulo_deg, massa, k_mola, amplitude):
+    theta = math.radians(angulo_deg)
+    x_atual = amplitude * math.cos(theta)
     
-    # Reduzido para 150 pontos para garantir máxima fluidez sem perder a curvatura
-    x = np.linspace(-15, 15, 150)
-    y = a * (x**2) + b * x + c
+    em = 0.5 * k_mola * (amplitude**2)
+    epe = 0.5 * k_mola * (x_atual**2)
+    ec = max(0.0, em - epe)
     
-    cor_linha = '#2980b9' if a > 0 else '#e67e22'
-    nome_linha = 'f(x) (Boca pra cima)' if a > 0 else 'f(x) (Boca pra baixo)'
+    fig = make_subplots(rows=1, cols=2, column_widths=[0.7, 0.3], horizontal_spacing=0.05)
     
-    # Curva principal
-    fig.add_trace(go.Scatter(
-        x=x, y=y, mode='lines', name=nome_linha,
-        line=dict(color=cor_linha, width=3.5),
-        hoverinfo='x+y'
-    ))
+    # Base e Parede
+    fig.add_shape(type="rect", x0=-amplitude-3, y0=-0.8, x1=amplitude+2, y1=0, fillcolor="#bdc3c7", line=dict(width=0), row=1, col=1)
+    fig.add_shape(type="rect", x0=-amplitude-3, y0=0, x1=-amplitude-2.5, y1=1.8, fillcolor="#95a5a6", line=dict(width=0), row=1, col=1)
     
-    # Corte no eixo Y
-    if -15 <= c <= 15:
-        fig.add_trace(go.Scatter(
-            x=[0], y=[c], mode='markers+text', name='Corte no Eixo Y (c)',
-            marker=dict(color='#8e44ad', size=10, line=dict(color='white', width=2)),
-            text=[f' c = {c}'], textposition='middle right', textfont=dict(color='#8e44ad', size=13)
-        ))
-
-    delta = b**2 - 4*a*c
+    # Mola
+    x_mola, y_mola = criar_mola(-amplitude-2.5, x_atual - 0.4, 0.4, n_voltas=12)
+    fig.add_trace(go.Scatter(x=x_mola, y=y_mola, mode='lines', line=dict(color='#7f8c8d', width=2), hoverinfo='skip'), row=1, col=1)
     
-    # Raízes
-    if mostrar_raizes and delta >= 0:
-        x1 = (-b + math.sqrt(delta)) / (2*a)
-        x2 = (-b - math.sqrt(delta)) / (2*a)
-        
-        raizes_x = [r for r in [x1, x2] if -10 <= r <= 10]
-        raizes_y = [0] * len(raizes_x)
-        textos = [f'x = {r:.1f}' for r in raizes_x]
-        
-        if raizes_x:
-            fig.add_trace(go.Scatter(
-                x=raizes_x, y=raizes_y, mode='markers+text', name='Raízes (Zeros)',
-                marker=dict(color='#2ecc71', size=12, symbol='diamond', line=dict(color='white', width=2)),
-                text=textos, textposition='bottom center', textfont=dict(color='#27ae60', size=14, family="Arial Black")
-            ))
-
-    # Vértice
-    if mostrar_vertice:
-        xv = -b / (2*a)
-        yv = -delta / (4*a)
-        
-        fig.add_trace(go.Scatter(
-            x=[xv, xv], y=[-20, 20], mode='lines', name='Eixo de Simetria',
-            line=dict(color='#7f8c8d', width=2, dash='dot'), hoverinfo='skip'
-        ))
-        
-        if -10 <= xv <= 10 and -15 <= yv <= 15:
-            tipo_extremo = "Mínimo" if a > 0 else "Máximo"
-            fig.add_trace(go.Scatter(
-                x=[xv], y=[yv], mode='markers+text', name=f'Vértice ({tipo_extremo})',
-                marker=dict(color='#e74c3c', size=14, symbol='star', line=dict(color='white', width=2)),
-                text=[f' V({xv:.1f}, {yv:.1f})'], textposition='middle right', 
-                textfont=dict(color='#c0392b', size=14, family="Arial Black")
-            ))
-
-    return criar_layout_cartesiano(fig, title="Gráfico da Parábola")
+    # Bloco
+    fig.add_shape(type="rect", x0=x_atual-0.4, y0=0, x1=x_atual+0.4, y1=0.8, fillcolor="#3498db", line=dict(color="#2980b9", width=2), row=1, col=1)
+    
+    # Barras
+    fig.add_trace(go.Bar(x=['Ec', 'Epe', 'Em'], y=[ec, epe, em], marker_color=[COR_EC, COR_EPE, COR_EM], text=[f"{ec:.1f}J", f"{epe:.1f}J", f"{em:.1f}J"], textposition='auto'), row=1, col=2)
+    
+    fig.update_layout(showlegend=False, plot_bgcolor='white', margin=dict(l=10, r=10, t=20, b=10), height=380)
+    fig.update_xaxes(range=[-amplitude-3, amplitude+2], showgrid=False, zeroline=False, visible=False, row=1, col=1)
+    fig.update_yaxes(range=[-1, 2.5], showgrid=False, zeroline=False, visible=False, row=1, col=1)
+    fig.update_yaxes(range=[0, em * 1.15], title="Energia (Joules)", row=1, col=2)
+    return fig
 
 # ============================================
-# TÍTULO PRINCIPAL
+# TÍTULO E NAVEGAÇÃO POR ABAS SUPERIORES
 # ============================================
-st.markdown('<div class="main-title">🎢 Estudo da Função do 2º Grau</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Interaja com os coeficientes e explore a anatomia da parábola em tempo real</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">⚡ Sistemas Conservativos de Energia</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Acompanhe a transformação da energia mecânica em tempo real com alta fluidez</div>', unsafe_allow_html=True)
 
-# ============================================
-# NAVEGAÇÃO EM ABAS SUPERIORES
-# ============================================
-tab1, tab2, tab3 = st.tabs([
-    "1. Raízes: Bhaskara e Soma/Produto", 
-    "2. O Gráfico da Parábola",
-    "3. O Vértice (Máximos e Mínimos)"
+tab1, tab2 = st.tabs([
+    "1. Rampa em 'U' (Gravitacional)", 
+    "2. Sistema Massa-Mola (Elástica)"
 ])
 
 # ============================================
-# TÓPICO 1: RAÍZES
+# ABA 1: RAMPA EM U
 # ============================================
 with tab1:
     st.markdown("""
-    <div class="concept-card" style="border-left-color: #2ecc71;">
-        <b>O que são as raízes?</b> São os valores de <b>x</b> que fazem a função ser igual a zero (onde o gráfico corta o eixo horizontal). 
-        Podemos encontrá-las pela Fórmula de Bhaskara ou pelas relações lógicas de Soma e Produto.
+    <div class="concept-card" style="border-left-color: #9b59b6;">
+        <b>Princípio:</b> Ao descer a rampa, a esfera perde altura (perde Energia Potencial Gravitacional) e ganha velocidade (ganha Energia Cinética). 
+        A soma permanece constante na ausência de atrito!
     </div>
     """, unsafe_allow_html=True)
     
-    col_ctrl, col_math = st.columns([1, 2.5])
+    col_c1, col_c2 = st.columns([1, 2.5])
     
-    with col_ctrl:
+    with col_c1:
         st.markdown("<div class='param-box'>", unsafe_allow_html=True)
-        st.subheader("🎛️ Coeficientes")
-        a = st.slider("Valor de 'a'", -5.0, 5.0, 1.0, step=0.5, key='a1')
-        if a == 0:
-            st.error("Se a = 0, a função não é do 2º grau!")
-            st.stop()
-        b = st.slider("Valor de 'b'", -10.0, 10.0, -2.0, step=0.5, key='b1')
-        c = st.slider("Valor de 'c'", -15.0, 15.0, -8.0, step=0.5, key='c1')
+        st.subheader("🎛️ Parâmetros")
+        massa_u = st.slider("Massa da esfera (kg)", 1.0, 10.0, 2.0, step=0.5, key='mu')
+        h_max_u = st.slider("Altura inicial (m)", 2.0, 10.0, 5.0, step=0.5, key='hu')
+        
+        # Controle de estado para animação fluida sem travamento de loop pesado
+        if 'animando_u' not in st.session_state:
+            st.session_state.animando_u = False
+            st.session_state.angulo_u = 0
+
+        col_b1, col_b2 = st.columns(2)
+        if col_b1.button("▶️ Iniciar / Pausar", key='btn_u'):
+            st.session_state.animando_u = not st.session_state.animando_u
+        if col_b2.button("⏹️ Resetar", key='btn_res_u'):
+            st.session_state.animando_u = False
+            st.session_state.angulo_u = 0
         st.markdown("</div>", unsafe_allow_html=True)
-        
-        sinal_b = f"+ {b}" if b >= 0 else f"- {abs(b)}"
-        sinal_c = f"+ {c}" if c >= 0 else f"- {abs(c)}"
-        st.markdown(f"<div class='equation-box'>f(x) = {a}x² {sinal_b}x {sinal_c}</div>", unsafe_allow_html=True)
-        
-        fig = plot_parabola(a, b, c, mostrar_raizes=True, mostrar_vertice=False)
-        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-    with col_math:
-        delta = b**2 - 4*a*c
-        sub_tab1, sub_tab2 = st.tabs(["Fórmula de Bhaskara", "Soma e Produto"])
+    with col_c2:
+        # Placeholder único para atualizar o gráfico suavemente sem redesenhar a página inteira
+        grafico_u = st.empty()
+        fig_u = plot_rampa_u(st.session_state.angulo_u, massa_u, h_max_u)
+        grafico_u.plotly_chart(fig_u, use_container_width=True, config={'displayModeBar': False})
         
-        with sub_tab1:
-            st.subheader("1. Cálculo do Discriminante (Δ)")
-            st.markdown(rf"$$ \Delta = b^2 - 4ac $$")
-            st.markdown(rf"$$ \Delta = ({b})^2 - 4 \cdot ({a}) \cdot ({c}) = \mathbf{{{delta}}} $$")
-            
-            st.markdown("---")
-            st.subheader("2. Aplicando Bhaskara")
-            
-            if delta < 0:
-                st.error(f"Como Δ = {delta} (negativo), a equação **não possui raízes reais**.")
-            elif delta == 0:
-                x1 = -b / (2*a)
-                st.warning(f"Como Δ = 0, a equação possui **duas raízes reais e iguais**.")
-                st.markdown(rf"$$ x = \mathbf{{{x1:.2f}}} $$")
-            else:
-                x1 = (-b + math.sqrt(delta)) / (2*a)
-                x2 = (-b - math.sqrt(delta)) / (2*a)
-                st.success(f"Como Δ > 0, há **duas raízes reais distintas**.")
-                st.markdown(rf"$$ x_1 = \mathbf{{{x1:.2f}}} \quad \text{{e}} \quad x_2 = \mathbf{{{x2:.2f}}} $$")
-
-        with sub_tab2:
-            st.subheader("Relações de Girard")
-            soma = -b / a
-            produto = c / a
-            st.markdown(rf"**SOMA (S):** $$ x_1 + x_2 = \frac{{-b}}{{a}} = \mathbf{{{soma:.2f}}} $$")
-            st.markdown(rf"**PRODUTO (P):** $$ x_1 \cdot x_2 = \frac{{c}}{{a}} = \mathbf{{{produto:.2f}}} $$")
+        if st.session_state.animando_u:
+            st.session_state.angulo_u = (st.session_state.angulo_u + 8) % 360
+            time.sleep(0.02)
+            st.rerun()
 
 # ============================================
-# TÓPICO 2: O GRÁFICO DA PARÁBOLA
+# ABA 2: SISTEMA MASSA-MOLA
 # ============================================
 with tab2:
     st.markdown("""
-    <div class="concept-card" style="border-left-color: #3498db;">
-        <b>A Geometria da Equação:</b> O parâmetro <b>a</b> define a concavidade e a abertura. 
-        O parâmetro <b>c</b> define o ponto de corte no eixo Y.
+    <div class="concept-card" style="border-left-color: #2ecc71;">
+        <b>Princípio:</b> Ao comprimir a mola, acumulamos Energia Potencial Elástica. Ao soltar, a energia se converte em movimento (Energia Cinética).
     </div>
     """, unsafe_allow_html=True)
     
-    col_ctrl, col_graf = st.columns([1, 2.5])
+    col_m1, col_m2 = st.columns([1, 2.5])
     
-    with col_ctrl:
+    with col_m1:
         st.markdown("<div class='param-box'>", unsafe_allow_html=True)
-        st.subheader("🎛️ Controles")
-        a = st.slider("Coeficiente 'a' (Concavidade)", -4.0, 4.0, 1.0, step=0.2, key='a2')
-        if a == 0:
-            st.stop()
-        b = st.slider("Coeficiente 'b' (Inclinação)", -10.0, 10.0, 0.0, step=0.5, key='b2')
-        c = st.slider("Coeficiente 'c' (Corte no eixo Y)", -15.0, 15.0, -5.0, step=1.0, key='c2')
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.subheader("🎛️ Parâmetros")
+        massa_m = st.slider("Massa do bloco (kg)", 1.0, 10.0, 2.0, step=0.5, key='mm')
+        k_m = st.slider("Constante elástica (N/m)", 10, 100, 50, step=10, key='km')
+        amp_m = st.slider("Amplitude (m)", 1.0, 5.0, 3.0, step=0.5, key='ampm')
         
-    with col_graf:
-        fig = plot_parabola(a, b, c, mostrar_raizes=False, mostrar_vertice=False)
-        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+        if 'animando_m' not in st.session_state:
+            st.session_state.animando_m = False
+            st.session_state.angulo_m = 0
 
-# ============================================
-# TÓPICO 3: O VÉRTICE
-# ============================================
-with tab3:
-    st.markdown("""
-    <div class="concept-card" style="border-left-color: #e74c3c;">
-        <b>O Ponto Extremo:</b> O Vértice representa o valor <b>Mínimo</b> (boca para cima) ou <b>Máximo</b> (boca para baixo) da função.
-    </div>
-    """, unsafe_allow_html=True)
-    
-    col_ctrl, col_graf = st.columns([1, 2.5])
-    
-    with col_ctrl:
-        st.markdown("<div class='param-box'>", unsafe_allow_html=True)
-        a = st.slider("Valor de 'a'", -3.0, 3.0, -1.0, step=0.5, key='a3')
-        if a == 0:
-            st.stop()
-        b = st.slider("Valor de 'b'", -10.0, 10.0, 4.0, step=0.5, key='b3')
-        c = st.slider("Valor de 'c'", -15.0, 15.0, 5.0, step=0.5, key='c3')
+        col_bm1, col_bm2 = st.columns(2)
+        if col_bm1.button("▶️ Iniciar / Pausar", key='btn_m'):
+            st.session_state.animando_m = not st.session_state.animando_m
+        if col_bm2.button("⏹️ Resetar", key='btn_res_m'):
+            st.session_state.animando_m = False
+            st.session_state.angulo_m = 0
         st.markdown("</div>", unsafe_allow_html=True)
+
+    with col_m2:
+        grafico_m = st.empty()
+        fig_m = plot_massa_mola(st.session_state.angulo_m, massa_m, k_m, amp_m)
+        grafico_m.plotly_chart(fig_m, use_container_width=True, config={'displayModeBar': False})
         
-        delta = b**2 - 4*a*c
-        xv = -b / (2*a)
-        yv = -delta / (4*a)
-        
-        st.subheader("🧮 Coordenadas do Vértice")
-        st.markdown(rf"$$ x_v = \mathbf{{{xv:.2f}}} \quad | \quad y_v = \mathbf{{{yv:.2f}}} $$")
-        
-        if a > 0:
-            st.success(f"Ponto de **MÍNIMO**: valor mínimo = **{yv:.2f}**.")
-        else:
-            st.error(f"Ponto de **MÁXIMO**: valor máximo = **{yv:.2f}**.")
-            
-    with col_graf:
-        fig = plot_parabola(a, b, c, mostrar_raizes=False, mostrar_vertice=True)
-        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+        if st.session_state.animando_m:
+            st.session_state.angulo_m = (st.session_state.angulo_m + 8) % 360
+            time.sleep(0.02)
+            st.rerun()
 
 # Rodapé
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888; font-size: 0.85rem; padding: 1rem;">
-    🎢 <b>Matemática Visual</b> — Ferramenta otimizada para alta fluidez interativa.
+    ⚡ <b>Física Visual: Energia</b> — Ferramenta educacional otimizada para alta fluidez interativa.
 </div>
 """, unsafe_allow_html=True)
